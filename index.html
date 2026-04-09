@@ -211,13 +211,16 @@
 
         function setupFilters() {
             const genres = new Set(['All Genres']), directors = new Set(['All Directors']),
-                  actors = new Set(['All Actors']), ages = new Set(['All Ratings']),
-                  years = new Set(['All Years']);
+                  actors = new Set(['All Actors']), years = new Set(['All Years']);
 
             allMovies.forEach(m => {
-                m.genre.split(', ').forEach(g => genres.add(g));
-                directors.add(m.director_name); actors.add(m.lead_actor);
-                ages.add(m.age_rating); years.add(m.release_year);
+                // Only pull filters from visible movies
+                if (!isUnder18 || m.age_rating !== '18+') {
+                    m.genre.split(', ').forEach(g => genres.add(g));
+                    directors.add(m.director_name); 
+                    actors.add(m.lead_actor);
+                    years.add(m.release_year);
+                }
             });
 
             populateSelect('genreFilt', Array.from(genres));
