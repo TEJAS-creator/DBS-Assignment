@@ -1,0 +1,349 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>StreamView</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <style>
+        :root { 
+            --nflx-red: #E50914; 
+            --nflx-black: #000000; 
+            --glass-bg: rgba(18, 18, 18, 0.7);
+            --glass-border: rgba(255, 255, 255, 0.1);
+            --glass-blur: blur(15px);
+        }
+
+        body { 
+            background-color: var(--nflx-black); 
+            color: white; 
+            font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; 
+            padding-bottom: 260px;
+            overflow-x: hidden;
+        }
+
+        /* AGE VERIFICATION MODAL */
+        #ageModal {
+            position: fixed; inset: 0; background: rgba(0,0,0,0.95);
+            display: flex; align-items: center; justify-content: center;
+            z-index: 1000; backdrop-filter: blur(20px);
+        }
+
+        .glass-panel {
+            background: var(--glass-bg);
+            backdrop-filter: var(--glass-blur);
+            -webkit-backdrop-filter: var(--glass-blur);
+            border: 1px solid var(--glass-border);
+            border-radius: 20px;
+        }
+
+        /* FIXED FLIP LOGIC */
+        .flip-card { width: 220px; height: 320px; perspective: 1000px; margin-bottom: 20px; }
+        .flip-card-inner { 
+            position: relative; width: 100%; height: 100%; 
+            transition: transform 0.6s cubic-bezier(0.4, 0, 0.2, 1); 
+            transform-style: preserve-3d; cursor: pointer;
+        }
+        .flip-card.flipped .flip-card-inner { transform: rotateY(180deg); }
+        
+        .flip-card-front, .flip-card-back { 
+            position: absolute; width: 100%; height: 100%; 
+            backface-visibility: hidden; 
+            border-radius: 20px; 
+            padding: 24px; top:0; left:0; 
+            display: flex; flex-direction: column;
+        }
+        
+        .flip-card-front { 
+            background: #181818; 
+            border: 1px solid #333;
+            justify-content: center; align-items: center;
+            z-index: 2; 
+        }
+        .flip-card-back { 
+            background: var(--glass-bg);
+            backdrop-filter: var(--glass-blur);
+            -webkit-backdrop-filter: var(--glass-blur);
+            border: 2px solid var(--nflx-red); 
+            transform: rotateY(180deg); 
+            justify-content: space-between;
+        }
+
+        /* RANGE SLIDER */
+        input[type=range] { accent-color: var(--nflx-red); cursor: pointer; }
+
+        /* BOTTOM BAR */
+        #recommendationBar {
+            position: fixed; bottom: 0; left: 0; width: 100%; height: 240px;
+            background: rgba(10, 10, 10, 0.85); backdrop-filter: blur(25px);
+            border-top: 1px solid var(--glass-border);
+            border-radius: 24px 24px 0 0;
+            z-index: 100; padding: 25px 50px; transform: translateY(100%);
+            transition: transform 0.5s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+        #recommendationBar.active { transform: translateY(0); }
+
+        select, input[type="text"] {
+            background: rgba(255,255,255,0.05); border: 1px solid #444; color: #ccc;
+            padding: 8px; border-radius: 8px; font-size: 11px; outline: none;
+        }
+        select:focus { border-color: var(--nflx-red); background: #000; }
+
+        .fav-btn { position: absolute; top: 15px; left: 15px; z-index: 10; }
+        .star-yellow { color: #fbbf24; }
+        .star-gray { color: #444; }
+    </style>
+</head>
+<body>
+
+
+    <div class="p-8">
+        <nav class="glass-panel p-6 mb-10 flex flex-col gap-6">
+            <div class="flex flex-col md:flex-row justify-between items-center gap-4">
+                <h1 class="text-red-600 text-5xl font-black italic tracking-tighter">STREAMVIEW</h1>
+                <div class="flex items-center gap-6">
+                    <button onclick="toggleFavs()" id="favToggle" class="text-sm font-medium text-gray-400 hover:text-white transition uppercase">My List</button>
+                    <button onclick="showViewsModal()" class="text-sm font-medium text-red-600 hover:text-white transition uppercase border border-red-600/30 px-3 py-1 rounded">DB Views</button>
+                    <div class="relative">
+                        <i class="fa-solid fa-search absolute left-3 top-3 text-gray-600 text-xs"></i>
+                        <input type="text" id="search" oninput="applyFilters()" placeholder="Search library..." class="pl-9 w-64">
+                    </div>
+                </div>
+            </div>
+
+            <div class="grid grid-cols-2 md:grid-cols-6 gap-4">
+                <div class="flex flex-col gap-1">
+                    <label class="text-[9px] text-gray-500 font-bold uppercase">Genre</label>
+                    <select id="genreFilt" onchange="applyFilters()"></select>
+                </div>
+                <div class="flex flex-col gap-1">
+                    <label class="text-[9px] text-gray-500 font-bold uppercase">Director</label>
+                    <select id="dirFilt" onchange="applyFilters()"></select>
+                </div>
+                <div class="flex flex-col gap-1">
+                    <label class="text-[9px] text-gray-500 font-bold uppercase">Actor</label>
+                    <select id="actorFilt" onchange="applyFilters()"></select>
+                </div>
+                <div class="flex flex-col gap-1">
+                    <span class="text-[9px] text-gray-500 font-bold tracking-widest">YEAR</span>
+                    <select id="yearFilt" onchange="applyFilters()">
+                        <option>All Years</option>
+                    </select>
+                </div>
+                <div class="flex flex-col gap-1">
+                    <div class="flex justify-between items-center">
+                        <label class="text-[9px] text-gray-500 font-bold uppercase">Rating</label>
+                        <span id="rateLabel" class="text-[10px] text-red-600 font-bold">0.0</span>
+                    </div>
+                    <input type="range" id="rateFilt" min="0" max="10" step="0.5" value="0" oninput="updateRateLabel(this.value)">
+                </div>
+            </div>
+        </nav>
+
+        <div id="movieGrid" class="flex flex-wrap gap-8 justify-center"></div>
+    </div>
+
+    <div id="recommendationBar">
+        <div class="flex justify-between items-center mb-6">
+            <h3 id="recTitle" class="text-white font-bold text-xl">Recommendations</h3>
+            <button onclick="hideRecs()" class="text-gray-500 hover:text-white text-3xl">&times;</button>
+        </div>
+        <div id="recContainer" class="flex gap-5 overflow-x-auto pb-4"></div>
+    </div>
+
+    <!-- SQL VIEWS MODAL -->
+    <div id="viewsModal" class="fixed inset-0 bg-black/90 hidden z-[200] items-center justify-center backdrop-blur-md">
+        <div class="glass-panel p-10 max-w-4xl w-full border-red-600/50 border overflow-hidden flex flex-col max-h-[80vh]">
+            <div class="flex justify-between items-center mb-6">
+                <div>
+                    <h2 class="text-white text-3xl font-black italic">DATABASE VIEWS</h2>
+                    <p class="text-red-600 text-[10px] font-bold tracking-widest uppercase">SQL Concept Demonstration</p>
+                </div>
+                <button onclick="closeViewsModal()" class="text-gray-500 hover:text-white text-4xl">&times;</button>
+            </div>
+            
+            <div class="flex gap-4 mb-8">
+                <button onclick="fetchView('top-rated')" class="bg-red-600 px-4 py-2 rounded text-xs font-bold uppercase">Top Rated Movies View</button>
+                <button onclick="fetchView('director-stats')" class="bg-[#222] px-4 py-2 rounded text-xs font-bold uppercase hover:bg-red-600 transition">Director Stats View</button>
+            </div>
+
+            <div id="viewResults" class="overflow-y-auto pr-2 custom-scrollbar">
+                <p class="text-gray-500 italic text-sm">Select a view to see the resulting data from the SQL database...</p>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let allMovies = [];
+        let showOnlyFavs = false;
+
+        async function loadMovies() {
+            try {
+                const res = await fetch('http://127.0.0.1:5000/api/movies');
+                allMovies = await res.json();
+                setupFilters();
+                applyFilters();
+            } catch (err) {
+                console.error("Backend offline");
+            }
+        }
+
+        function setupFilters() {
+            const genres = new Set(['All Genres']), directors = new Set(['All Directors']),
+                  actors = new Set(['All Actors']), ages = new Set(['All Ratings']),
+                  years = new Set(['All Years']);
+
+            allMovies.forEach(m => {
+                m.genre.split(', ').forEach(g => genres.add(g));
+                directors.add(m.director_name); actors.add(m.lead_actor);
+                ages.add(m.age_rating); years.add(m.release_year);
+            });
+
+            populateSelect('genreFilt', Array.from(genres));
+            populateSelect('dirFilt', Array.from(directors));
+            populateSelect('actorFilt', Array.from(actors));
+            populateSelect('yearFilt', Array.from(years).sort((a,b) => b-a));
+        }
+
+        function populateSelect(id, list) {
+            document.getElementById(id).innerHTML = list.map(i => `<option value="${i}">${i}</option>`).join('');
+        }
+
+        function updateRateLabel(val) {
+            document.getElementById('rateLabel').innerText = val;
+            applyFilters();
+        }
+
+        async function showSimilar(e, id, title) {
+            e.stopPropagation();
+            document.getElementById('recTitle').innerText = `Similar to ${title}`;
+            document.getElementById('recommendationBar').classList.add('active');
+            
+            const res = await fetch(`http://127.0.0.1:5000/api/movies/recommend/${id}`);
+            const data = await res.json();
+            
+            document.getElementById('recContainer').innerHTML = data.map(m => `
+                <div class="min-w-[170px] bg-[#111] p-4 rounded-xl border border-gray-800 text-center">
+                    <p class="text-[11px] font-bold uppercase truncate text-white">${m.title}</p>
+                    <p class="text-[10px] text-red-600 mt-2">★ ${m.avg_rating}</p>
+                </div>
+            `).join('');
+        }
+
+        function hideRecs() { document.getElementById('recommendationBar').classList.remove('active'); }
+
+        function renderMovies(movies) {
+            const grid = document.getElementById('movieGrid');
+            grid.innerHTML = movies.map(m => `
+                <div class="flip-card" onclick="this.classList.toggle('flipped')">
+                    <div class="flip-card-inner">
+                        <div class="flip-card-front">
+                            <div class="fav-btn ${m.is_favorite ? 'star-yellow' : 'star-gray'}" onclick="event.stopPropagation(); toggleFavorite(${m.movie_id})">
+                                <i class="fa-solid fa-star text-xl"></i>
+                            </div>
+                            <div class="flex flex-col items-center">
+                                <div class="w-16 h-16 rounded-full bg-red-600/10 flex items-center justify-center mb-4">
+                                    <i class="fa-solid fa-film text-2xl text-red-600"></i>
+                                </div>
+                                <p class="text-[10px] text-gray-500 font-bold uppercase tracking-widest mb-1">${m.genre.split(',')[0]}</p>
+                                <h3 class="text-sm font-bold text-center uppercase px-4 leading-tight">${m.title}</h3>
+                                <p class="text-[10px] text-gray-500 mt-3 font-bold">★ ${m.avg_rating} | ${m.release_year}</p>
+                            </div>
+                        </div>
+                        <div class="flip-card-back">
+                            <div>
+                                <h4 class="text-red-600 font-black text-[10px] mb-3 uppercase">${m.genre}</h4>
+                                <p class="text-[11px] text-gray-300 italic line-clamp-6 leading-relaxed">${m.summary}</p>
+                            </div>
+                            <button onclick="showSimilar(event, ${m.movie_id}, '${m.title.replace(/'/g, "\\'")}')" 
+                                    class="bg-white text-black text-[10px] font-black py-2.5 rounded-lg uppercase tracking-widest hover:bg-red-600 hover:text-white transition-all">
+                                Similar
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        async function toggleFavorite(movieId) {
+            const movie = allMovies.find(m => m.movie_id === movieId);
+            const newStatus = movie.is_favorite ? 0 : 1;
+            const res = await fetch('http://127.0.0.1:5000/api/movies/favorite', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ movie_id: movieId, is_favorite: newStatus })
+            });
+            if (res.ok) { movie.is_favorite = newStatus; applyFilters(); }
+        }
+
+        function toggleFavs() {
+            showOnlyFavs = !showOnlyFavs;
+            document.getElementById('favToggle').classList.toggle('text-white');
+            applyFilters();
+        }
+
+        function applyFilters() {
+            const term = document.getElementById('search').value.toLowerCase();
+            const gen = document.getElementById('genreFilt').value;
+            const dir = document.getElementById('dirFilt').value;
+            const act = document.getElementById('actorFilt').value;
+            const year = document.getElementById('yearFilt').value;
+            const rate = parseFloat(document.getElementById('rateFilt').value);
+
+            const filtered = allMovies.filter(m => {
+                return (m.title.toLowerCase().includes(term)) &&
+                       (gen === 'All Genres' || m.genre.includes(gen)) &&
+                       (dir === 'All Directors' || m.director_name === dir) &&
+                       (act === 'All Actors' || m.lead_actor === act) &&
+                       (year === 'All Years' || m.release_year.toString() === year) &&
+                       (m.avg_rating >= rate) &&
+                       (!showOnlyFavs || m.is_favorite);
+            });
+            renderMovies(filtered);
+        }
+
+        // --- VIEW LOGIC ---
+        function showViewsModal() { document.getElementById('viewsModal').classList.remove('hidden'); document.getElementById('viewsModal').classList.add('flex'); }
+        function closeViewsModal() { document.getElementById('viewsModal').classList.add('hidden'); document.getElementById('viewsModal').classList.remove('flex'); }
+
+        async function fetchView(type) {
+            const container = document.getElementById('viewResults');
+            container.innerHTML = '<p class="text-red-600 animate-pulse font-bold">Querying SQL View...</p>';
+            
+            try {
+                const res = await fetch(`http://127.0.0.1:5000/api/views/${type}`);
+                const data = await res.json();
+                
+                if (type === 'top-rated') {
+                    container.innerHTML = `
+                        <table class="w-full text-left text-xs">
+                            <thead class="text-red-600 uppercase border-b border-gray-800">
+                                <tr><th class="py-3">Title</th><th class="py-3">Director</th><th class="py-3">Rating</th></tr>
+                            </thead>
+                            <tbody class="text-gray-300">
+                                ${data.map(m => `<tr class="border-b border-gray-900/50 hover:bg-white/5"><td class="py-3 font-bold text-white">${m.title}</td><td class="py-3">${m.director_name}</td><td class="py-3 text-red-600 font-bold">★ ${m.avg_rating}</td></tr>`).join('')}
+                            </tbody>
+                        </table>
+                    `;
+                } else {
+                    container.innerHTML = `
+                        <table class="w-full text-left text-xs">
+                            <thead class="text-red-600 uppercase border-b border-gray-800">
+                                <tr><th class="py-3">Director</th><th class="py-3">Movies</th><th class="py-3">Avg Rating</th></tr>
+                            </thead>
+                            <tbody class="text-gray-300">
+                                ${data.map(d => `<tr class="border-b border-gray-900/50 hover:bg-white/5"><td class="py-3 font-bold text-white">${d.director_name}</td><td class="py-3">${d.movie_count}</td><td class="py-3 text-red-600 font-bold">★ ${d.avg_director_rating.toFixed(1)}</td></tr>`).join('')}
+                            </tbody>
+                        </table>
+                    `;
+                }
+            } catch (err) {
+                container.innerHTML = '<p class="text-red-600">Error connecting to database views.</p>';
+            }
+        }
+
+        window.onload = loadMovies;
+    </script>
+</body>
+</html>
