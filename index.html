@@ -98,6 +98,18 @@
 <body>
 
 
+    <div id="ageModal">
+        <div class="glass-panel p-12 text-center max-w-md border-red-600/30 border">
+            <h2 class="text-white text-4xl font-black italic mb-2">STREAMVIEW</h2>
+            <p class="text-red-600 font-bold tracking-widest text-[10px] mb-6 uppercase">Select Your Experience</p>
+            <div class="flex flex-col gap-4">
+                <button onclick="verifyAge(true)" class="bg-red-600 hover:bg-red-700 text-white py-3 rounded-lg font-bold uppercase tracking-widest text-xs transition-all">Enter 18+ Library</button>
+                <button onclick="verifyAge(false)" class="bg-white hover:bg-gray-200 text-black py-3 rounded-lg font-bold uppercase tracking-widest text-xs transition-all">U (Under 18s Only)</button>
+            </div>
+            <p class="mt-6 text-[10px] text-gray-500">By entering, you agree to our terms of service.</p>
+        </div>
+    </div>
+
     <div class="p-8">
         <nav class="glass-panel p-6 mb-10 flex flex-col gap-6">
             <div class="flex flex-col md:flex-row justify-between items-center gap-4">
@@ -177,6 +189,13 @@
     <script>
         let allMovies = [];
         let showOnlyFavs = false;
+        let isUnder18 = false;
+
+        function verifyAge(adultMode) {
+            isUnder18 = !adultMode;
+            document.getElementById('ageModal').style.display = 'none';
+            loadMovies();
+        }
 
         async function loadMovies() {
             try {
@@ -223,7 +242,10 @@
             const res = await fetch(`http://127.0.0.1:5000/api/movies/recommend/${id}`);
             const data = await res.json();
             
-            document.getElementById('recContainer').innerHTML = data.map(m => `
+            // Filter recommendations too if in Under 18 mode
+            const filteredRecs = isUnder18 ? data.filter(m => m.age_rating !== '18+') : data;
+
+            document.getElementById('recContainer').innerHTML = filteredRecs.map(m => `
                 <div class="min-w-[170px] bg-[#111] p-4 rounded-xl border border-gray-800 text-center">
                     <p class="text-[11px] font-bold uppercase truncate text-white">${m.title}</p>
                     <p class="text-[10px] text-red-600 mt-2">★ ${m.avg_rating}</p>
@@ -292,7 +314,10 @@
             const rate = parseFloat(document.getElementById('rateFilt').value);
 
             const filtered = allMovies.filter(m => {
-                return (m.title.toLowerCase().includes(term)) &&
+                const matchesAgeRestriction = isUnder18 ? (m.age_rating !== '18+') : true;
+
+                return matchesAgeRestriction &&
+                       (m.title.toLowerCase().includes(term)) &&
                        (gen === 'All Genres' || m.genre.includes(gen)) &&
                        (dir === 'All Directors' || m.director_name === dir) &&
                        (act === 'All Actors' || m.lead_actor === act) &&
@@ -342,8 +367,6 @@
                 container.innerHTML = '<p class="text-red-600">Error connecting to database views.</p>';
             }
         }
-
-        window.onload = loadMovies;
     </script>
 </body>
 </html>
