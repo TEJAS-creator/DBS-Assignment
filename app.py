@@ -52,6 +52,44 @@ def init_views():
     except Exception as e:
         print(f"Error initializing views: {e}")
 
+def init_triggers():
+    """Ensures the ActivityLog table and triggers exist."""
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        
+        # 1. Create Log Table
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS ActivityLog (
+                log_id INT AUTO_INCREMENT PRIMARY KEY,
+                movie_id INT,
+                action_type VARCHAR(50),
+                log_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (movie_id) REFERENCES Movies(movie_id)
+            )
+        """)
+        
+        # 2. Create Trigger (Drop first to avoid errors)
+        cursor.execute("DROP TRIGGER IF EXISTS AfterFavoriteToggle")
+        cursor.execute("""
+            CREATE TRIGGER AfterFavoriteToggle
+            AFTER UPDATE ON Movies
+            FOR EACH ROW
+            BEGIN
+                IF OLD.is_favorite <> NEW.is_favorite THEN
+                    INSERT INTO ActivityLog (movie_id, action_type)
+                    VALUES (NEW.movie_id, IF(NEW.is_favorite = 1, 'Marked as Favorite', 'Removed from Favorites'));
+                END IF;
+            END
+        """)
+        
+        conn.commit()
+        cursor.close()
+        conn.close()
+        print("SQL Triggers initialized successfully.")
+    except Exception as e:
+        print(f"Error initializing triggers: {e}")
+
 @app.route('/api/movies', methods=['GET'])
 def get_movies():
     conn = get_db_connection()
@@ -136,6 +174,26 @@ def get_director_stats_view():
     conn.close()
     return jsonify(data)
 
+@app.route('/api/activity-log', methods=['GET'])
+def get_activity_log():
+    """Fetches the log entries created by the SQL Trigger"""
+    conn = get_db_connection()
+    cursor = conn.cursor(dictionary=True)
+    # Join with Movies table to get titles
+    query = """
+        SELECT a.log_id, m.title, a.action_type, DATE_FORMAT(a.log_time, '%%H:%%i:%%s') as time 
+        FROM ActivityLog a 
+        JOIN Movies m ON a.movie_id = m.movie_id 
+        ORDER BY a.log_id DESC 
+        LIMIT 10
+    """
+    cursor.execute(query)
+    logs = cursor.fetchall()
+    cursor.close()
+    conn.close()
+    return jsonify(logs)
+
 if __name__ == '__main__':
     init_views()
+    init_triggers()
     app.run(debug=True, port=5000)

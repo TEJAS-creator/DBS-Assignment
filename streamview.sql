@@ -141,3 +141,26 @@ SELECT director_name, COUNT(*) as movie_count, AVG(avg_rating) as avg_director_r
 FROM Movies
 GROUP BY director_name
 ORDER BY movie_count DESC;
+
+-- --- TABLE: ACTIVITY LOG ---
+CREATE TABLE IF NOT EXISTS ActivityLog (
+    log_id INT AUTO_INCREMENT PRIMARY KEY,
+    movie_id INT,
+    action_type VARCHAR(50),
+    log_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (movie_id) REFERENCES Movies(movie_id)
+);
+
+-- --- TRIGGER: LOG FAVORITE ACTIONS ---
+-- This trigger automatically logs every time a user toggles a favorite
+DELIMITER //
+CREATE TRIGGER AfterFavoriteToggle
+AFTER UPDATE ON Movies
+FOR EACH ROW
+BEGIN
+    IF OLD.is_favorite <> NEW.is_favorite THEN
+        INSERT INTO ActivityLog (movie_id, action_type)
+        VALUES (NEW.movie_id, IF(NEW.is_favorite = 1, 'Marked as Favorite', 'Removed from Favorites'));
+    END IF;
+END //
+DELIMITER ;
