@@ -264,6 +264,9 @@
                             <div class="fav-btn ${m.is_favorite ? 'star-yellow' : 'star-gray'}" onclick="event.stopPropagation(); toggleFavorite(${m.movie_id})">
                                 <i class="fa-solid fa-star text-xl"></i>
                             </div>
+                            <span class="absolute top-4 right-4 border px-2 py-0.5 rounded text-[9px] font-bold ${m.age_rating === '18+' ? 'border-red-600 text-red-600' : 'border-green-500 text-green-500'}">
+                                ${m.age_rating}
+                            </span>
                             <div class="flex flex-col items-center">
                                 <div class="w-16 h-16 rounded-full bg-red-600/10 flex items-center justify-center mb-4">
                                     <i class="fa-solid fa-film text-2xl text-red-600"></i>
