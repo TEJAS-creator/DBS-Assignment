@@ -181,7 +181,7 @@ def get_activity_log():
     cursor = conn.cursor(dictionary=True)
     # Join with Movies table to get titles
     query = """
-        SELECT a.log_id, m.title, a.action_type, DATE_FORMAT(a.log_time, '%%H:%%i:%%s') as time 
+        SELECT a.log_id, m.title, a.action_type
         FROM ActivityLog a 
         JOIN Movies m ON a.movie_id = m.movie_id 
         ORDER BY a.log_id DESC 

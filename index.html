@@ -395,13 +395,11 @@
                     </div>
                     <table class="w-full text-left text-xs text-gray-300">
                         <tr class="border-b border-gray-800 text-gray-500">
-                            <th class="py-2">TIME</th>
                             <th class="py-2">MOVIE</th>
                             <th class="py-2">ACTION</th>
                         </tr>
                         ${logs.map(log => `
                             <tr class="border-b border-gray-900">
-                                <td class="py-2">${log.time}</td>
                                 <td class="py-2 text-white font-bold">${log.title}</td>
                                 <td class="py-2"><span class="px-2 py-0.5 rounded text-[9px] font-bold ${log.action_type.includes('Marked') ? 'bg-green-600/20 text-green-500' : 'bg-red-600/20 text-red-500'}">${log.action_type.toUpperCase()}</span></td>
                             </tr>
